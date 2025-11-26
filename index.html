@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Nocturne Library — Infinite Edition</title>
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=Cinzel:wght@400;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: { noctBlack: '#0f0f12', bloodRed: '#c41e3a', sapphireBlue: '#0f4c81' },
+          fontFamily: { playfair: ['"Playfair Display"', 'serif'], cinzel: ['Cinzel', 'serif'] }
+        }
+      }
+    }
+  </script>
+  <style>
+    .glow { text-shadow: 0 0 90px #c41e3a; }
+    .orb { animation: float 25s infinite ease-in-out; }
+    @keyframes float { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-40px); } }
+    .book { opacity: 0; transform: translateY(50px); animation: rise 1s forwards; }
+    @keyframes rise { to { opacity: 1; transform: translateY(0); } }
+    #loading { display: none; }
+  </style>
+</head>
+<body class="bg-noctBlack text-white min-h-screen overflow-x-hidden">
+
+  <!-- Floating Orbs -->
+  <div class="fixed inset-0 -z-10 overflow-hidden pointer-events-none">
+    <div class="absolute inset-0 bg-gradient-to-br from-noctBlack via-[#1a0010] to-[#001022]"></div>
+    <div class="orb absolute w-[700px] h-[700px] rounded-full mix-blend-screen opacity-20" style="top:-10%;left:-10%;background:radial-gradient(circle,rgba(196,30,58,0.25),transparent 70%)"></div>
+    <div class="orb absolute w-[800px] h-[800px] rounded-full mix-blend-screen opacity-15" style="bottom:-20%;right:-10%;background:radial-gradient(circle,rgba(15,76,129,0.2),transparent 70%)"></div>
+  </div>
+
+  <!-- Hero -->
+  <section id="hero" class="min-h-screen flex flex-col items-center justify-center px-6 text-center">
+    <div class="space-y-20 max-w-5xl">
+      <h1 class="text-8xl md:text-9xl font-black bg-gradient-to-r from-bloodRed via-white to-sapphireBlue bg-clip-text text-transparent font-playfair glow">
+        Nocturne Library
+      </h1>
+      <p class="text-3xl md:text-5xl font-cinzel text-gray-300">WHISPER YOUR DARKEST DESIRES INTO THE VOID...</p>
+
+      <div class="relative group max-w-4xl mx-auto">
+        <div class="absolute -inset-2 bg-gradient-to-r from-bloodRed to-sapphireBlue rounded-3xl blur-3xl opacity-60 group-hover:opacity-90 transition duration-1000"></div>
+        <div class="relative bg-black/60 backdrop-blur-xl rounded-3xl p-10 border border-white/10">
+          <div class="flex flex-col md:flex-row items-center gap-6">
+            <input id="search" type="text" placeholder="Fantasy, Gothic Horror, Romance..." 
+                   class="flex-1 bg-transparent text-2xl md:text-3xl text-center md:text-left outline-none placeholder-gray-500"/>
+            <button onclick="startInfiniteSearch()" class="px-14 py-5 bg-bloodRed hover:bg-bloodRed/90 rounded-2xl font-bold text-xl shadow-2xl shadow-bloodRed/60 transition hover:scale-110">
+              Enter the Void
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Quick Genres -->
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-6">
+        <button onclick="startInfiniteSearch('Fantasy')" class="px-10 py-5 rounded-full border border-purple-500 text-purple-400 hover:bg-purple-500/10 font-cinzel text-lg transition">Fantasy</button>
+        <button onclick="startInfiniteSearch('Gothic Horror')" class="px-10 py-5 rounded-full border border-bloodRed text-bloodRed hover:bg-bloodRed/20 font-cinzel text-lg transition">Gothic Horror</button>
+        <button onclick="startInfiniteSearch('Romance')" class="px-10 py-5 rounded-full border border-pink-500 text-pink-400 hover:bg-pink-500/10 font-cinzel text-lg transition">Romance</button>
+        <button onclick="startInfiniteSearch('Science Fiction')" class="px-10 py-5 rounded-full border border-cyan-500 text-cyan-400 hover:bg-cyan-500/10 font-cinzel text-lg transition">Sci-Fi</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- Infinite Results -->
+  <section id="results" class="hidden py-20 px-6">
+    <div class="max-w-screen-2xl mx-auto">
+      <button onclick="location.reload()" class="mb-12 text-bloodRed hover:text-white text-xl font-cinzel">← Return to Sanctuary</button>
+      <h2 id="title" class="text-7xl md:text-8xl text-center mb-20 font-playfair bg-gradient-to-r from-bloodRed to-sapphireBlue bg-clip-text text-transparent">
+        Fantasy
+      </h2>
+      <div id="grid" class="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-7 xl:grid-cols-9 gap-6"></div>
+      <div id="loading" class="text-center py-16 text-3xl text-gray-500 font-cinzel">Summoning more tomes from the abyss...</div>
+    </div>
+  </section>
+
+  <script>
+    let query = '';
+    let index = 0;
+    const perPage = 40;
+    let loading = false;
+
+    async function fetchBooks() {
+      if (loading) return;
+      loading = true;
+      document.getElementById('loading').style.display = 'block';
+
+      const url = `https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(query)}&startIndex=${index}&maxResults=${perPage}&orderBy=relevance&printType=books`;
+      const res = await fetch(url);
+      const data = await res.json();
+
+      const grid = document.getElementById('grid');
+      (data.items || []).forEach((item, i) => {
+        const b = item.volumeInfo;
+        const img = (b.imageLinks?.thumbnail || b.imageLinks?.smallThumbnail || '').replace('http://','https://') || 'https://via.placeholder.com/300x450/111/fff?text=No+Cover';
+        const div = document.createElement('div');
+        div.className = 'book';
+        div.style.animationDelay = `${i * 50}ms`;
+        div.innerHTML = `
+          <div class="group relative rounded-2xl overflow-hidden border border-white/10 hover:border-bloodRed transition duration-500">
+            <img src="${img}" alt="${b.title}" class="w-full aspect-[3/4.5] object-cover group-hover:scale-110 transition duration-1000">
+            <div class="absolute inset-0 bg-gradient-to-t from-black/90 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition">
+              <div class="absolute bottom-0 p-4 text-left">
+                <h3 class="text-sm font-bold line-clamp-2">${b.title}</h3>
+                <p class="text-xs text-sapphireBlue">${b.authors?.join(', ') || 'Unknown'}</p>
+              </div>
+            </div>
+          </div>
+        `;
+        grid.appendChild(div);
+      });
+
+      index += perPage;
+      loading = false;
+      document.getElementById('loading').style.display = data.items?.length < perPage ? 'none' : 'block';
+    }
+
+    function startInfiniteSearch(custom = null) {
+      query = custom || document.getElementById('search').value.trim() || 'fantasy';
+      if (custom) document.getElementById('title').textContent = custom;
+      document.getElementById('hero').classList.add('hidden');
+      document.getElementById('results').classList.remove('hidden');
+      document.getElementById('grid').innerHTML = '';
+      index = 0;
+      fetchBooks();
+
+      // Infinite scroll
+      window.onscroll = () => {
+        if (window.innerHeight + window.scrollY >= document.body.offsetHeight - 1000) {
+          fetchBooks();
+        }
+      };
+    }
+
+    document.getElementById('search').addEventListener('keypress', e => {
+      if (e.key === 'Enter') startInfiniteSearch();
+    });
+  </script>
+</body>
+</html>
